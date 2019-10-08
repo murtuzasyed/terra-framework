@@ -1,0 +1,1 @@
+{"version":3,"sources":["webpack:///packages/terra-application-navigation/lib/terra-dev-site/test/common/FixedHeight.module.scss"],"names":[],"mappings":"AAAA,mCAEI,WAAY","file":"206-a28571f210df1282e1c0.css","sourcesContent":[":local {\n  .outer {\n    height: 70px;\n  }\n}\n"]}
