@@ -8,9 +8,10 @@ import CollapsibleTabs from './_CollapsibleTabs';
 import CollapsedTabs from './_CollapsedTabs';
 import TabUtils from './TabUtils';
 import styles from './Tabs.module.scss';
+import DragSort from './DragSort';
 
 const cx = classNames.bind(styles);
-
+const childIndex = (child, children) => children.indexOf(child);
 /**
 NOTE: This is being commented out until discussions have been resolved around if modular tabs should be removed.
 const variants = {
@@ -71,11 +72,16 @@ class Tabs extends React.Component {
     this.getInitialState = this.getInitialState.bind(this);
     this.getActiveTabIndex = this.getActiveTabIndex.bind(this);
     this.handleOnChange = this.handleOnChange.bind(this);
+    this.handleTabDragOver = this.handleTabDragOver.bind(this);
+    this.handleTabDragStart = this.handleTabDragStart.bind(this);
+    this.handleTabDragEnd = this.handleTabDragEnd.bind(this);
     this.handleTruncationChange = this.handleTruncationChange.bind(this);
     this.wrapPaneOnClick = this.wrapPaneOnClick.bind(this);
     this.state = {
       activeKey: this.getInitialState(),
       isLabelTruncated: false,
+      orderChanged : false,
+      children : props.children
     };
   }
 
@@ -83,7 +89,7 @@ class Tabs extends React.Component {
     if (this.props.activeKey) {
       return null;
     }
-    return TabUtils.initialSelectedTabKey(this.props.children, this.props.defaultActiveKey);
+    return TabUtils.initialSelectedTabKey(this.state.children, this.props.defaultActiveKey);
   }
 
   getActiveTabIndex() {
@@ -109,6 +115,42 @@ class Tabs extends React.Component {
     }
   }
 
+  handleTabDragStart(tab) {
+    return (event) => {
+      this.sortable.dragStart(childIndex(tab, this.state.children), event);
+    };
+  }
+
+
+  handleTabDragOver(tab) {
+    return (event) => {
+      // Make sure the drag source is actually this sortable!
+      // Dragging from a different tab list can trigger a false positive.
+      if (!this.sortable.isDragging()) {
+        return;
+      }
+
+      // Only handle the drag over if the sortable returns true.
+      this.sortable.dragOver(childIndex(tab, this.state.children), event);
+    }
+  }
+
+  /**
+   * Handles the dragend event.
+   * @returns {undefined} Returns nothing.
+   * @private
+   */
+  handleTabDragEnd() {
+    return (event) => {
+      this.sortable.dragEnd();
+      if (this.sortable.didChange()) {
+        this.setState({
+          children: this.sortable._items
+        })
+      }
+    };
+  }
+
   handleTruncationChange(isLabelTruncated) {
     if (this.state.isLabelTruncated !== isLabelTruncated) {
       this.setState({ isLabelTruncated });
@@ -130,7 +172,6 @@ class Tabs extends React.Component {
       tabFill,
       fill,
       onChange,
-      children,
       activeKey,
       defaultActiveKey,
       ...customProps
@@ -148,6 +189,7 @@ class Tabs extends React.Component {
     let content = null;
     let isIconOnly = false;
     const clonedPanes = [];
+    const children = this.state.children;
     React.Children.forEach(children, (child) => {
       let isActive = false;
       if (child.key === this.state.activeKey || child.key === activeKey) {
@@ -163,8 +205,12 @@ class Tabs extends React.Component {
         className: cx([{ 'is-active': isActive }, child.props.className]),
         'aria-selected': isActive,
         onClick: this.wrapPaneOnClick(child),
+        onDragStart: this.handleTabDragStart(child),
+        onDragOver: this.handleTabDragOver(child),
+        onDragEnd: this.handleTabDragEnd(child),
       }));
     });
+    this.sortable = new DragSort(clonedPanes, 'horizontal', this.state.activeKey).setUniqueIdGenerator((tab) => tab.props.id);
 
     content = React.Children.map(content, contentItem => (
       React.cloneElement(contentItem, { isLabelHidden: isIconOnly || this.state.isLabelTruncated })
